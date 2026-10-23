@@ -1,0 +1,39 @@
+{
+  "error": false,
+  "mensaje": null,
+  "respuesta": {
+    "apellido": "DIAZ",
+    "barrio": "PARQUE DEMO",
+    "calle": "BOULEVARD SIMULADO",
+    "ciudad": "SANTA ESPERANZA",
+    "codigoError": 0,
+    "codigof": 0,
+    "cpostal": "2000",
+    "cuil": "20-07654321-7",
+    "departamento": "",
+    "descripcionError": "DNI/PAS Firmado",
+    "ejemplar": "D",
+    "emision": "2016-08-08",
+    "fechaNacimiento": "1948-01-17",
+    "fechaf": "2026-10-23",
+    "idCiudadano": null,
+    "idTramitePrincipal": 907654321,
+    "idTramiteTarjetaReimpresa": 0,
+    "mensajef": null,
+    "monoblock": "",
+    "municipio": "DEPARTAMENTO DEMO",
+    "nombres": "ROBERTO OSCAR",
+    "nroError": "0",
+    "numeroCalle": 3300,
+    "origenf": "BT_ARG_DEMO (FICTICIO)",
+    "paso": null,
+    "piso": "",
+    "provincia": "SANTA FE",
+    "vencimiento": "2031-08-08",
+    "_demo": {
+      "ficticio": true,
+      "sexo": "M",
+      "vigente": true
+    }
+  }
+}

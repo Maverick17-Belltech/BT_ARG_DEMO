@@ -1,0 +1,39 @@
+{
+  "error": false,
+  "mensaje": null,
+  "respuesta": {
+    "apellido": "GOMEZ",
+    "barrio": "BARRIO TEST",
+    "calle": "CALLE PRUEBA",
+    "ciudad": "VILLA EJEMPLO",
+    "codigoError": 0,
+    "codigof": 0,
+    "cpostal": "1600",
+    "cuil": "23-28333444-9",
+    "departamento": "",
+    "descripcionError": "DNI/PAS Firmado",
+    "ejemplar": "C",
+    "emision": "2021-02-11",
+    "fechaNacimiento": "1980-09-03",
+    "fechaf": "2026-10-23",
+    "idCiudadano": null,
+    "idTramitePrincipal": 928333444,
+    "idTramiteTarjetaReimpresa": 0,
+    "mensajef": null,
+    "monoblock": "",
+    "municipio": "PARTIDO DEMO",
+    "nombres": "MARTIN ALEJANDRO",
+    "nroError": "0",
+    "numeroCalle": 455,
+    "origenf": "BT_ARG_DEMO (FICTICIO)",
+    "paso": null,
+    "piso": "",
+    "provincia": "BUENOS AIRES",
+    "vencimiento": "2036-02-11",
+    "_demo": {
+      "ficticio": true,
+      "sexo": "M",
+      "vigente": true
+    }
+  }
+}

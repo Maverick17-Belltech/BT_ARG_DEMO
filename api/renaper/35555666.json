@@ -1,0 +1,39 @@
+{
+  "error": false,
+  "mensaje": null,
+  "respuesta": {
+    "apellido": "RAMIREZ",
+    "barrio": "LOS ENSAYOS",
+    "calle": "PASAJE FICTICIO",
+    "ciudad": "CIUDAD FICTICIA",
+    "codigoError": 0,
+    "codigof": 0,
+    "cpostal": "5000",
+    "cuil": "27-35555666-8",
+    "departamento": "A",
+    "descripcionError": "DNI VENCIDO",
+    "ejemplar": "A",
+    "emision": "2009-06-30",
+    "fechaNacimiento": "1990-11-25",
+    "fechaf": "2026-10-23",
+    "idCiudadano": null,
+    "idTramitePrincipal": 935555666,
+    "idTramiteTarjetaReimpresa": 0,
+    "mensajef": null,
+    "monoblock": "",
+    "municipio": "MUNICIPIO DEMO",
+    "nombres": "SOFIA",
+    "nroError": "0",
+    "numeroCalle": 78,
+    "origenf": "BT_ARG_DEMO (FICTICIO)",
+    "paso": null,
+    "piso": "1",
+    "provincia": "CORDOBA",
+    "vencimiento": "2024-06-30",
+    "_demo": {
+      "ficticio": true,
+      "sexo": "F",
+      "vigente": false
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "dni": "30111222",
+  "nombre": "Lucía",
+  "apellido": "Fernández",
+  "banca": {
+    "esCliente": true,
+    "segmento": "Premium",
+    "cuenta": "CA $ 0001-0000101",
+    "tarjeta": "Visa terminada en 1111",
+    "saldo": "254300.50",
+    "resumenDigital": false
+  },
+  "seguros": {
+    "esCliente": false
+  },
+  "financiera": {
+    "esCliente": false
+  },
+  "gas": {
+    "esCliente": true,
+    "nroCliente": "400000000101",
+    "domicilioSuministro": "Av. Demo 1200 3B",
+    "deuda": "0.00",
+    "facturaDigital": true
+  },
+  "luz": {
+    "esCliente": false
+  },
+  "_demo": {
+    "ficticio": true
+  }
+}

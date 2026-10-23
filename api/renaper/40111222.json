@@ -1,0 +1,39 @@
+{
+  "error": false,
+  "mensaje": null,
+  "respuesta": {
+    "apellido": "LOPEZ",
+    "barrio": "NUEVO DEMO",
+    "calle": "CALLE INVENTADA",
+    "ciudad": "CIUDAD FICTICIA",
+    "codigoError": 0,
+    "codigof": 0,
+    "cpostal": "5500",
+    "cuil": "27-40111222-2",
+    "departamento": "C",
+    "descripcionError": "DNI/PAS Firmado",
+    "ejemplar": "A",
+    "emision": "2018-03-15",
+    "fechaNacimiento": "1997-07-07",
+    "fechaf": "2026-10-23",
+    "idCiudadano": null,
+    "idTramitePrincipal": 940111222,
+    "idTramiteTarjetaReimpresa": 0,
+    "mensajef": null,
+    "monoblock": "",
+    "municipio": "MUNICIPIO DEMO",
+    "nombres": "VALENTINA",
+    "nroError": "0",
+    "numeroCalle": 900,
+    "origenf": "BT_ARG_DEMO (FICTICIO)",
+    "paso": null,
+    "piso": "5",
+    "provincia": "MENDOZA",
+    "vencimiento": "2033-03-15",
+    "_demo": {
+      "ficticio": true,
+      "sexo": "F",
+      "vigente": true
+    }
+  }
+}

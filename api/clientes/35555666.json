@@ -1,0 +1,34 @@
+{
+  "dni": "35555666",
+  "nombre": "Sofía",
+  "apellido": "Ramírez",
+  "banca": {
+    "esCliente": false
+  },
+  "seguros": {
+    "esCliente": false
+  },
+  "financiera": {
+    "esCliente": true,
+    "prestamo": "PP-0000666",
+    "cuotasTotales": 24,
+    "cuotasPagas": 10,
+    "cuotaMensual": "45200.00",
+    "enMora": true,
+    "diasMora": 35
+  },
+  "gas": {
+    "esCliente": false
+  },
+  "luz": {
+    "esCliente": true,
+    "nroMedidor": "3270000202",
+    "nroCuenta": "6480000202",
+    "domicilioSuministro": "Pasaje Ficticio 78 1A",
+    "deuda": "0.00",
+    "facturaDigital": true
+  },
+  "_demo": {
+    "ficticio": true
+  }
+}

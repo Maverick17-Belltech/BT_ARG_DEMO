@@ -1,0 +1,32 @@
+{
+  "dni": "7654321",
+  "nombre": "Roberto",
+  "apellido": "Díaz",
+  "banca": {
+    "esCliente": false
+  },
+  "seguros": {
+    "esCliente": true,
+    "poliza": "HOG-0000321",
+    "ramo": "Hogar",
+    "cobertura": "Integral",
+    "vigenciaHasta": "2026-12-31",
+    "siniestroAbierto": true
+  },
+  "financiera": {
+    "esCliente": false
+  },
+  "gas": {
+    "esCliente": true,
+    "nroCliente": "400000000202",
+    "domicilioSuministro": "Boulevard Simulado 3300",
+    "deuda": "32100.00",
+    "facturaDigital": false
+  },
+  "luz": {
+    "esCliente": false
+  },
+  "_demo": {
+    "ficticio": true
+  }
+}

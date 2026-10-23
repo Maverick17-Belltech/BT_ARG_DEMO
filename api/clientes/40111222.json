@@ -1,0 +1,23 @@
+{
+  "dni": "40111222",
+  "nombre": "Valentina",
+  "apellido": "López",
+  "banca": {
+    "esCliente": false
+  },
+  "seguros": {
+    "esCliente": false
+  },
+  "financiera": {
+    "esCliente": false
+  },
+  "gas": {
+    "esCliente": false
+  },
+  "luz": {
+    "esCliente": false
+  },
+  "_demo": {
+    "ficticio": true
+  }
+}

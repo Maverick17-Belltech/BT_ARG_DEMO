@@ -1,0 +1,33 @@
+{
+  "dni": "28333444",
+  "nombre": "Martín",
+  "apellido": "Gómez",
+  "banca": {
+    "esCliente": false
+  },
+  "seguros": {
+    "esCliente": true,
+    "poliza": "AUT-0000444",
+    "ramo": "Automotor",
+    "cobertura": "Todo riesgo",
+    "vigenciaHasta": "2027-03-31",
+    "siniestroAbierto": false
+  },
+  "financiera": {
+    "esCliente": false
+  },
+  "gas": {
+    "esCliente": false
+  },
+  "luz": {
+    "esCliente": true,
+    "nroMedidor": "3270000101",
+    "nroCuenta": "6480000101",
+    "domicilioSuministro": "Calle Prueba 455",
+    "deuda": "18750.00",
+    "facturaDigital": false
+  },
+  "_demo": {
+    "ficticio": true
+  }
+}

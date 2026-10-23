@@ -1,0 +1,39 @@
+{
+  "error": false,
+  "mensaje": null,
+  "respuesta": {
+    "apellido": "SOSA",
+    "barrio": "CENTRO DEMO",
+    "calle": "AV. BELLTECH DEMO",
+    "ciudad": "CIUDAD FICTICIA",
+    "codigoError": 0,
+    "codigof": 0,
+    "cpostal": "1000",
+    "cuil": "20-33777888-8",
+    "departamento": "",
+    "descripcionError": "DNI/PAS Firmado",
+    "ejemplar": "B",
+    "emision": "2020-10-01",
+    "fechaNacimiento": "1988-01-01",
+    "fechaf": "2026-10-23",
+    "idCiudadano": null,
+    "idTramitePrincipal": 933777888,
+    "idTramiteTarjetaReimpresa": 0,
+    "mensajef": null,
+    "monoblock": "",
+    "municipio": "MUNICIPIO DEMO",
+    "nombres": "SEBASTIAN",
+    "nroError": "0",
+    "numeroCalle": 100,
+    "origenf": "BT_ARG_DEMO (FICTICIO)",
+    "paso": null,
+    "piso": "",
+    "provincia": "BUENOS AIRES",
+    "vencimiento": "2035-10-01",
+    "_demo": {
+      "ficticio": true,
+      "sexo": "M",
+      "vigente": true
+    }
+  }
+}

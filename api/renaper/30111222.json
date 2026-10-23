@@ -1,0 +1,39 @@
+{
+  "error": false,
+  "mensaje": null,
+  "respuesta": {
+    "apellido": "FERNANDEZ",
+    "barrio": "CENTRO DEMO",
+    "calle": "AV. DEMO",
+    "ciudad": "CIUDAD FICTICIA",
+    "codigoError": 0,
+    "codigof": 0,
+    "cpostal": "1000",
+    "cuil": "27-30111222-5",
+    "departamento": "B",
+    "descripcionError": "DNI/PAS Firmado",
+    "ejemplar": "B",
+    "emision": "2019-05-20",
+    "fechaNacimiento": "1983-04-12",
+    "fechaf": "2026-10-23",
+    "idCiudadano": null,
+    "idTramitePrincipal": 930111222,
+    "idTramiteTarjetaReimpresa": 0,
+    "mensajef": null,
+    "monoblock": "",
+    "municipio": "MUNICIPIO DEMO",
+    "nombres": "LUCIA BELEN",
+    "nroError": "0",
+    "numeroCalle": 1200,
+    "origenf": "BT_ARG_DEMO (FICTICIO)",
+    "paso": null,
+    "piso": "3",
+    "provincia": "BUENOS AIRES",
+    "vencimiento": "2034-05-20",
+    "_demo": {
+      "ficticio": true,
+      "sexo": "F",
+      "vigente": true
+    }
+  }
+}
