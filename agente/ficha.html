@@ -5,16 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ficha del cliente · BT_ARG Demo</title>
 <!--
-  BT_ARG_DEMO · Ficha del cliente para el agente (CXone Agent, POPURL → ContactPanel)
+  BT_ARG_DEMO · Ficha del cliente para el agente (CXone Agent, POPURL → ContactPanel)  v2 (render instantáneo)
   DEMO Belltech Argentina: TODOS LOS DATOS SON FICTICIOS. Esta página solo LEE datos.
-  Uso: agente/ficha.html?dni=33777888&vertical=GAS&contacto=720691938613&dato=CLIENTEGAS&ivr=3-1
-  Parámetros:
-    dni       DNI del cliente (obligatorio)
-    vertical  BANCA | SEGUROS | FINANCIERA | LUZ | GAS (obligatorio)
-    contacto  ID de contacto de CXone (opcional)
-    dato      Cómo se identificó: DNI | MEDIDOR | CUENTA | CLIENTEGAS (opcional)
-    ivr       Opciones marcadas en el IVR, ej. "3-1" (opcional)
-    res       Resultado de la identificación: OK | NO_CLIENTE (opcional)
+
+  1) Se dibuja AL INSTANTE con los datos que manda el IVR en el link (nombre, alertas, cómo se identificó).
+  2) Después completa en segundo plano desde la API (planilla): datos personales, producto y vista 360.
+
+  Parámetros (todos opcionales salvo dni y vertical):
+    dni, vertical (BANCA|SEGUROS|FINANCIERA|LUZ|GAS), contacto, dato (DNI|MEDIDOR|CUENTA|CLIENTEGAS), ivr, res
+    nom, ape          nombre y apellido que ya conoce el IVR
+    escli             SI | NO  (cliente de esta vertical)
+    venc              SI | NO  (DNI vencido)
+    deuda             importe de deuda (Luz/Gas), ej. 12500.00
+    mora              SI | NO  (Financiera)
+  Ej.: agente/ficha.html?dni=33777888&vertical=GAS&dato=CLIENTEGAS&ivr=3-1&nom=Sebastian&ape=Sosa&escli=SI&venc=NO&deuda=12500.00&mora=NO
 -->
 <style>
   :root {
@@ -43,10 +47,10 @@
   .chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; background: var(--brand-soft); color: var(--brand); margin: 2px 4px 2px 0; }
   .chip.si { background: var(--ok-soft); color: var(--ok); }
   .chip.no { background: #eef0f3; color: var(--muted); }
+  .chip.venc { background: var(--warn-soft); color: var(--warn); }
+  .cargando { color: var(--muted); font-style: italic; }
   .estado { text-align: center; padding: 40px 16px; color: var(--muted); }
   footer { padding: 8px 12px 16px; font-size: 11px; color: var(--muted); text-align: center; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
   @media (min-width: 720px) { main { grid-template-columns: 1fr 1fr; } .full { grid-column: 1 / -1; } }
 </style>
 </head>
@@ -56,7 +60,7 @@
   <div class="sub" id="subtitulo">Belltech Argentina · Demo NICE CXone</div>
 </header>
 <main id="contenido">
-  <div class="estado full" id="estado">Cargando datos del cliente…</div>
+  <div class="estado full">Cargando datos del cliente…</div>
 </main>
 <footer>DEMO Belltech Argentina · Datos ficticios · Fuente: planilla BT_ARG_Alta_Datos_Demo (Google Sheets)</footer>
 
@@ -65,31 +69,38 @@
 const API = "https://script.google.com/macros/s/AKfycbwmYcSf9tH_sZeU-rq1fZzFKtT7vawtmUJFaOJFmbiBiDBH8-m5vgQiYL_4qbEAbinOiA/exec";
 
 const MARCAS = {
-  BANCA:      { nombre: "Banco Andino",      rubro: "Banca",       color: "#1f4e78", clave: "banca" },
-  SEGUROS:    { nombre: "Seguros del Plata", rubro: "Seguros",     color: "#5b2c83", clave: "seguros" },
-  FINANCIERA: { nombre: "Crédito Pampa",     rubro: "Financiera",  color: "#0f6e5a", clave: "financiera" },
-  GAS:        { nombre: "EnerGas Sur",       rubro: "Gas",         color: "#c4511a", clave: "gas" },
+  BANCA:      { nombre: "Banco Andino",      rubro: "Banca",        color: "#1f4e78", clave: "banca" },
+  SEGUROS:    { nombre: "Seguros del Plata", rubro: "Seguros",      color: "#5b2c83", clave: "seguros" },
+  FINANCIERA: { nombre: "Crédito Pampa",     rubro: "Financiera",   color: "#0f6e5a", clave: "financiera" },
+  GAS:        { nombre: "EnerGas Sur",       rubro: "Gas",          color: "#c4511a", clave: "gas" },
   LUZ:        { nombre: "VoltaSur Energía",  rubro: "Electricidad", color: "#b8860b", clave: "luz" }
 };
-
 const ETIQUETAS = {
   segmento: "Segmento", cuenta: "Cuenta", tarjeta: "Tarjeta", saldo: "Saldo", resumenDigital: "Resumen digital",
   poliza: "Póliza", ramo: "Ramo", cobertura: "Cobertura", vigenciaHasta: "Vigente hasta", siniestroAbierto: "Siniestro abierto",
   prestamo: "Préstamo", cuotasTotales: "Cuotas totales", cuotasPagas: "Cuotas pagas", cuotaMensual: "Cuota mensual",
   enMora: "En mora", diasMora: "Días de mora",
   nroMedidor: "N° de medidor", nroCuenta: "N° de cuenta", nroCliente: "N° de cliente",
-  domicilioSuministro: "Domicilio de suministro", deuda: "Deuda", facturaDigital: "Factura digital",
-  cantidadProductos: "Productos"
+  domicilioSuministro: "Domicilio de suministro", deuda: "Deuda", facturaDigital: "Factura digital"
 };
 const MONEDA = ["saldo", "cuotaMensual", "deuda"];
-const DATO_TXT = { DNI: "DNI", MEDIDOR: "N° de medidor", CUENTA: "N° de cuenta", CLIENTEGAS: "N° de cliente", MEDIDOR_O_CUENTA: "Medidor o cuenta" };
+const DATO_TXT = { DNI: "DNI", MEDIDOR: "N° de medidor", CUENTA: "N° de cuenta", CLIENTEGAS: "N° de cliente" };
 
 const q = new URLSearchParams(location.search);
-const dni = (q.get("dni") || "").replace(/\D/g, "");
-const vertical = (q.get("vertical") || "").toUpperCase();
-const contacto = q.get("contacto") || "";
-const dato = (q.get("dato") || "").toUpperCase();
-const ivr = q.get("ivr") || "";
+const P = {
+  dni: (q.get("dni") || "").replace(/\D/g, ""),
+  vertical: (q.get("vertical") || "").toUpperCase(),
+  contacto: q.get("contacto") || "",
+  dato: (q.get("dato") || "").toUpperCase(),
+  ivr: q.get("ivr") || "",
+  nom: q.get("nom") || "",
+  ape: q.get("ape") || "",
+  escli: (q.get("escli") || "").toUpperCase(),
+  venc: (q.get("venc") || "").toUpperCase(),
+  deuda: q.get("deuda") || "",
+  mora: (q.get("mora") || "").toUpperCase()
+};
+const marca = MARCAS[P.vertical];
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -98,6 +109,101 @@ const pesos = (v) => {
   return isNaN(n) ? esc(v) : "$ " + n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 const siNo = (v) => (v === true || String(v).toLowerCase() === "true" || String(v).toUpperCase() === "SI");
+const CARGANDO = '<p class="cargando">Consultando sistema…</p>';
+
+// Estado: arranca con lo que mandó el IVR; la API lo completa después.
+const E = {
+  nombre: P.nom, apellido: P.ape,
+  esCliente: P.escli ? P.escli === "SI" : null,
+  dniVencido: P.venc === "SI",
+  deuda: P.deuda, enMora: P.mora === "SI",
+  persona: null, producto: null, cli: null, apiError: false
+};
+
+function alertas() {
+  const a = [];
+  const vert = P.vertical;
+  const prod = E.producto || {};
+  const deuda = prod.deuda !== undefined ? prod.deuda : E.deuda;
+  const mora = prod.enMora !== undefined ? siNo(prod.enMora) : E.enMora;
+  if (E.esCliente === false && marca) a.push(["warn", `No es cliente de ${marca.nombre}: oportunidad comercial.`]);
+  if (["GAS", "LUZ"].includes(vert) && Number(deuda) > 0)
+    a.push(["bad", `Deuda de ${pesos(deuda)}: riesgo de ${vert === "GAS" ? "suspensión" : "corte"} del suministro.`]);
+  if (vert === "FINANCIERA" && mora)
+    a.push(["bad", `Préstamo en mora${prod.diasMora ? ` (${esc(prod.diasMora)} días)` : ""}.`]);
+  if (vert === "SEGUROS" && siNo(prod.siniestroAbierto)) a.push(["warn", "Tiene un siniestro abierto."]);
+  if (["BANCA", "FINANCIERA"].includes(vert) && E.dniVencido)
+    a.push(["warn", `DNI vencido${E.persona ? ` (venció el ${esc(E.persona.vencimiento)})` : ""}. Solicitar actualización.`]);
+  if (a.length === 0) a.push(["ok", "Sin alertas. Cliente al día."]);
+  return a.map(([t, m]) => `<div class="alerta ${t}">${m}</div>`).join("");
+}
+
+function bloquePersona() {
+  if (E.apiError) return '<p class="cargando">No se pudo consultar el sistema. Los datos de arriba vienen del IVR.</p>';
+  const p = E.persona;
+  if (!p) return CARGANDO;
+  const dom = [p.calle, p.numeroCalle, p.piso && `Piso ${p.piso}`, p.departamento && `Dto. ${p.departamento}`].filter(Boolean).join(" ");
+  return `<dl>
+    <dt>DNI</dt><dd>${esc(P.dni)}</dd>
+    <dt>CUIL</dt><dd>${esc(p.cuil)}</dd>
+    <dt>Nacimiento</dt><dd>${esc(p.fechaNacimiento)}</dd>
+    <dt>Domicilio</dt><dd>${esc(dom)}</dd>
+    <dt>Localidad</dt><dd>${esc(p.ciudad)}, ${esc(p.provincia)} (${esc(p.cpostal)})</dd>
+    <dt>Ejemplar DNI</dt><dd>${esc(p.ejemplar)} · vence ${esc(p.vencimiento)}</dd>
+  </dl>`;
+}
+
+function bloqueProducto() {
+  if (E.apiError) return "";
+  if (!E.cli) {
+    // Mientras carga: si el IVR mandó la deuda, se muestra ya
+    return (["GAS", "LUZ"].includes(P.vertical) && E.deuda !== "")
+      ? `<dl><dt>Deuda</dt><dd>${pesos(E.deuda)}</dd></dl>${CARGANDO}` : CARGANDO;
+  }
+  const prod = E.producto;
+  if (!prod || !prod.esCliente) return `<p>Sin productos de ${esc(marca ? marca.nombre : "esta marca")}.</p>`;
+  return "<dl>" + Object.keys(prod)
+    .filter(k => !["esCliente", "cantidadProductos"].includes(k))
+    .map(k => {
+      let v = prod[k];
+      if (MONEDA.includes(k)) v = pesos(v);
+      else if (typeof v === "boolean" || ["true", "false"].includes(String(v).toLowerCase())) v = siNo(v) ? "Sí" : "No";
+      else v = esc(v);
+      return `<dt>${esc(ETIQUETAS[k] || k)}</dt><dd>${v}</dd>`;
+    }).join("") + "</dl>";
+}
+
+function bloque360() {
+  if (E.apiError) return "";
+  if (!E.cli) return CARGANDO;
+  return Object.values(MARCAS).map(m => {
+    const es = E.cli[m.clave] && E.cli[m.clave].esCliente;
+    return `<span class="chip ${es ? "si" : "no"}">${esc(m.nombre)}: ${es ? "cliente" : "no"}</span>`;
+  }).join("");
+}
+
+function render() {
+  const nombre = `${E.nombre} ${E.apellido}`.trim() || (E.persona ? `${E.persona.nombres} ${E.persona.apellido}` : `DNI ${P.dni}`);
+  const chipCli = E.esCliente === null ? "" : `<span class="chip">${E.esCliente ? "Cliente" : "No cliente"}</span>`;
+  const chipDni = `<span class="chip ${E.dniVencido ? "venc" : "si"}">DNI ${E.dniVencido ? "vencido" : "vigente"}</span>`;
+  $("contenido").innerHTML = `
+    <section class="card full">
+      <p class="nombre">${esc(nombre)}</p>${chipCli}${chipDni}
+    </section>
+    <section class="card full"><h2>Alertas</h2><div class="alertas">${alertas()}</div></section>
+    <section class="card"><h2>Datos personales</h2>${bloquePersona()}</section>
+    <section class="card"><h2>${esc(marca ? marca.nombre : "Producto")}</h2>${bloqueProducto()}</section>
+    <section class="card">
+      <h2>Contacto actual</h2>
+      <dl>
+        <dt>ID de contacto</dt><dd>${esc(P.contacto || "—")}</dd>
+        <dt>Se identificó con</dt><dd>${esc(DATO_TXT[P.dato] || P.dato || "—")}</dd>
+        <dt>Opciones en el IVR</dt><dd>${esc(P.ivr || "—")}</dd>
+        <dt>Validación</dt><dd>Padrón (formato RENAPER) + sistema comercial</dd>
+      </dl>
+    </section>
+    <section class="card"><h2>Vista 360 · Grupo Belltech Demo</h2>${bloque360()}</section>`;
+}
 
 async function api(tipo, id) {
   const r = await fetch(`${API}?tipo=${encodeURIComponent(tipo)}&id=${encodeURIComponent(id)}`);
@@ -105,113 +211,38 @@ async function api(tipo, id) {
   return r.json();
 }
 
-function mostrarEstado(txt) {
-  $("contenido").innerHTML = `<div class="estado full">${esc(txt)}</div>`;
-}
-
-async function iniciar() {
-  const marca = MARCAS[vertical];
-  if (marca) {
-    document.documentElement.style.setProperty("--brand", marca.color);
-    $("marca").textContent = marca.nombre;
-    $("subtitulo").textContent = `${marca.rubro} · Ficha del cliente · Demo NICE CXone`;
-    document.title = `${marca.nombre} · Ficha del cliente`;
-  }
-  if (!dni) { mostrarEstado("No se recibió el DNI del cliente (parámetro dni)."); return; }
-
-  let ren, cli;
+async function completarDesdeApi() {
   try {
-    [ren, cli] = await Promise.all([api("renaper", dni), api("clientes", dni)]);
+    const [ren, cli] = await Promise.all([api("renaper", P.dni), api("clientes", P.dni)]);
+    if (ren && !ren.error && ren.respuesta) {
+      E.persona = ren.respuesta;
+      if (E.persona._demo) E.dniVencido = !E.persona._demo.vigente;
+      if (!E.nombre) { E.nombre = cli.nombre || E.persona.nombres; E.apellido = cli.apellido || E.persona.apellido; }
+    }
+    if (cli && cli.encontrado !== false) {
+      E.cli = cli;
+      E.producto = marca ? (cli[marca.clave] || { esCliente: false }) : null;
+      if (E.producto) E.esCliente = !!E.producto.esCliente;
+    }
   } catch (e) {
-    mostrarEstado("No se pudo consultar la API de datos. Reintentá en unos segundos."); return;
+    E.apiError = true;
   }
-  if (ren.error || !ren.respuesta) { mostrarEstado(`No se encontró el DNI ${dni} en el padrón (demo).`); return; }
-
-  const p = ren.respuesta;
-  const vigente = p._demo ? p._demo.vigente : true;
-  const prod = marca && cli[marca.clave] ? cli[marca.clave] : { esCliente: false };
-  const domicilio = [p.calle, p.numeroCalle, p.piso && `Piso ${p.piso}`, p.departamento && `Dto. ${p.departamento}`].filter(Boolean).join(" ");
-
-  // ---- Alertas según el negocio de cada vertical ----
-  const alertas = [];
-  if (!prod.esCliente && marca) alertas.push(["warn", `No es cliente de ${marca.nombre}: oportunidad comercial.`]);
-  if (["GAS", "LUZ"].includes(vertical) && prod.esCliente && Number(prod.deuda) > 0)
-    alertas.push(["bad", `Deuda de ${pesos(prod.deuda)}: riesgo de ${vertical === "GAS" ? "suspensión" : "corte"} del suministro.`]);
-  if (vertical === "FINANCIERA" && siNo(prod.enMora))
-    alertas.push(["bad", `Préstamo en mora (${esc(prod.diasMora || "?")} días).`]);
-  if (vertical === "SEGUROS" && siNo(prod.siniestroAbierto))
-    alertas.push(["warn", "Tiene un siniestro abierto."]);
-  if (["BANCA", "FINANCIERA"].includes(vertical) && !vigente)
-    alertas.push(["warn", `DNI vencido (venció el ${esc(p.vencimiento)}). Solicitar actualización.`]);
-  if (alertas.length === 0) alertas.push(["ok", "Sin alertas. Cliente al día."]);
-
-  // ---- Producto de la vertical ----
-  let prodHtml = `<p>Sin productos de ${esc(marca ? marca.nombre : "esta marca")}.</p>`;
-  if (prod.esCliente) {
-    prodHtml = "<dl>" + Object.keys(prod)
-      .filter(k => !["esCliente", "cantidadProductos"].includes(k))
-      .map(k => {
-        let v = prod[k];
-        if (MONEDA.includes(k)) v = pesos(v);
-        else if (typeof v === "boolean" || ["true", "false"].includes(String(v).toLowerCase())) v = siNo(v) ? "Sí" : "No";
-        else v = esc(v);
-        return `<dt>${esc(ETIQUETAS[k] || k)}</dt><dd>${v}</dd>`;
-      }).join("") + "</dl>";
-  }
-
-  // ---- Otras marcas del grupo (vista 360) ----
-  const otras = Object.entries(MARCAS).map(([vk, m]) => {
-    const es = cli[m.clave] && cli[m.clave].esCliente;
-    return `<span class="chip ${es ? "si" : "no"}">${esc(m.nombre)}: ${es ? "cliente" : "no"}</span>`;
-  }).join("");
-
-  $("contenido").innerHTML = `
-    <section class="card full">
-      <p class="nombre">${esc(cli.nombre || p.nombres)} ${esc(cli.apellido || p.apellido)}</p>
-      <span class="chip">${prod.esCliente ? "Cliente" : "No cliente"}</span>
-      <span class="chip ${vigente ? "si" : ""}" style="${vigente ? "" : "background:var(--warn-soft);color:var(--warn)"}">DNI ${vigente ? "vigente" : "vencido"}</span>
-    </section>
-
-    <section class="card full">
-      <h2>Alertas</h2>
-      <div class="alertas">${alertas.map(([t, m]) => `<div class="alerta ${t}">${m}</div>`).join("")}</div>
-    </section>
-
-    <section class="card">
-      <h2>Datos personales</h2>
-      <dl>
-        <dt>DNI</dt><dd>${esc(dni)}</dd>
-        <dt>CUIL</dt><dd>${esc(p.cuil)}</dd>
-        <dt>Nacimiento</dt><dd>${esc(p.fechaNacimiento)}</dd>
-        <dt>Domicilio</dt><dd>${esc(domicilio)}</dd>
-        <dt>Localidad</dt><dd>${esc(p.ciudad)}, ${esc(p.provincia)} (${esc(p.cpostal)})</dd>
-        <dt>Ejemplar DNI</dt><dd>${esc(p.ejemplar)} · vence ${esc(p.vencimiento)}</dd>
-      </dl>
-    </section>
-
-    <section class="card">
-      <h2>${esc(marca ? marca.nombre : "Producto")}</h2>
-      ${prodHtml}
-    </section>
-
-    <section class="card">
-      <h2>Contacto actual</h2>
-      <dl>
-        <dt>ID de contacto</dt><dd>${esc(contacto || "—")}</dd>
-        <dt>Se identificó con</dt><dd>${esc(DATO_TXT[dato] || dato || "—")}</dd>
-        <dt>Opciones en el IVR</dt><dd>${esc(ivr || "—")}</dd>
-        <dt>Validación</dt><dd>Padrón (formato RENAPER) + sistema comercial</dd>
-      </dl>
-    </section>
-
-    <section class="card">
-      <h2>Vista 360 · Grupo Belltech Demo</h2>
-      ${otras}
-    </section>
-  `;
+  render();
 }
 
-iniciar();
+// ---- Inicio ----
+if (marca) {
+  document.documentElement.style.setProperty("--brand", marca.color);
+  $("marca").textContent = marca.nombre;
+  $("subtitulo").textContent = `${marca.rubro} · Ficha del cliente · Demo NICE CXone`;
+  document.title = `${marca.nombre} · Ficha del cliente`;
+}
+if (!P.dni) {
+  $("contenido").innerHTML = '<div class="estado full">No se recibió el DNI del cliente (parámetro dni).</div>';
+} else {
+  render();             // 1) al instante, con lo que mandó el IVR
+  completarDesdeApi();  // 2) completa desde la planilla
+}
 </script>
 </body>
 </html>
