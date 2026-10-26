@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ficha del cliente · BT_ARG Demo</title>
 <!--
-  BT_ARG_DEMO · Ficha del cliente para el agente (CXone Agent, POPURL → ContactPanel)  v2 (render instantáneo)
+  BT_ARG_DEMO · Ficha del cliente para el agente (CXone Agent, POPURL → ContactPanel)  v3 (render instantáneo + historial)
   DEMO Belltech Argentina: TODOS LOS DATOS SON FICTICIOS. Esta página solo LEE datos.
 
   1) Se dibuja AL INSTANTE con los datos que manda el IVR en el link (nombre, alertas, cómo se identificó).
-  2) Después completa en segundo plano desde la API (planilla): datos personales, producto y vista 360.
+  2) Después completa en segundo plano desde la API (planilla): datos personales, producto, vista 360,
+     historial de interacciones (planilla aparte BT_ARG_Interacciones_Demo) y cambios de datos (pestaña Historial).
 
   Parámetros (todos opcionales salvo dni y vertical):
     dni, vertical (BANCA|SEGUROS|FINANCIERA|LUZ|GAS), contacto, dato (DNI|MEDIDOR|CUENTA|CLIENTEGAS), ivr, res
@@ -51,6 +52,11 @@
   .cargando { color: var(--muted); font-style: italic; }
   .estado { text-align: center; padding: 40px 16px; color: var(--muted); }
   footer { padding: 8px 12px 16px; font-size: 11px; color: var(--muted); text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: bold; background: #f8fafb; }
+  tr.actual td { background: var(--brand-soft); font-weight: bold; }
+  .tabla { overflow-x: auto; }
   @media (min-width: 720px) { main { grid-template-columns: 1fr 1fr; } .full { grid-column: 1 / -1; } }
 </style>
 </head>
@@ -62,7 +68,7 @@
 <main id="contenido">
   <div class="estado full">Cargando datos del cliente…</div>
 </main>
-<footer>DEMO Belltech Argentina · Datos ficticios · Fuente: planilla BT_ARG_Alta_Datos_Demo (Google Sheets)</footer>
+<footer>DEMO Belltech Argentina · Datos ficticios · Fuentes: BT_ARG_Alta_Datos_Demo (clientes y cambios) · BT_ARG_Interacciones_Demo (historial) · Google Sheets</footer>
 
 <script>
 // URL pública de lectura de la API de la demo (Apps Script). Solo lectura: no hay claves en esta página.
@@ -117,7 +123,8 @@ const E = {
   esCliente: P.escli ? P.escli === "SI" : null,
   dniVencido: P.venc === "SI",
   deuda: P.deuda, enMora: P.mora === "SI",
-  persona: null, producto: null, cli: null, apiError: false
+  persona: null, producto: null, cli: null, apiError: false,
+  historial: null, cambios: null
 };
 
 function alertas() {
@@ -182,6 +189,43 @@ function bloque360() {
   }).join("");
 }
 
+const RES_TXT = { OK: "Identificado", NO_CLIENTE: "No cliente", FALLO: "No validado", ERROR_API: "Sin validar (error)" };
+const fechaCorta = (f) => esc(String(f || "").replace(/^(\d{4})-(\d{2})-(\d{2})/, "$3/$2/$1"));
+
+function bloqueHistorial() {
+  if (E.apiError) return '<p class="cargando">No se pudo consultar el historial.</p>';
+  if (!E.historial) return CARGANDO;
+  const filas = E.historial.slice();
+  // El contacto en curso puede no estar registrado todavía: se muestra igual, destacado
+  const yaEsta = P.contacto && filas.some(r => String(r.contactId) === String(P.contacto));
+  if (P.contacto && !yaEsta) {
+    filas.unshift({ fechaHora: "En curso", marca: marca ? marca.nombre : "", canal: "Voz", dato: P.dato, ivr: P.ivr,
+                    resultado: "OK", agente: "", contactId: P.contacto, disposicion: "" });
+  }
+  if (filas.length === 0) return "<p>Sin interacciones registradas.</p>";
+  return `<div class="tabla"><table>
+    <tr><th>Fecha</th><th>Marca</th><th>Canal</th><th>Se identificó con</th><th>IVR</th><th>Resultado</th><th>Agente</th><th>Conclusión / tema</th></tr>
+    ${filas.map(r => `<tr class="${String(r.contactId) === String(P.contacto) ? "actual" : ""}">
+      <td>${String(r.contactId) === String(P.contacto) ? "Ahora" : fechaCorta(r.fechaHora)}</td>
+      <td>${esc(r.marca)}</td><td>${esc(r.canal)}</td>
+      <td>${esc(DATO_TXT[String(r.dato).toUpperCase()] || r.dato || "—")}</td>
+      <td>${esc(r.ivr || "—")}</td>
+      <td>${esc(RES_TXT[r.resultado] || r.resultado || "—")}</td>
+      <td>${esc(r.agente || "—")}</td>
+      <td>${esc(r.disposicion || "—")}</td></tr>`).join("")}
+  </table></div>`;
+}
+
+function bloqueCambios() {
+  if (E.apiError || !E.cambios) return E.apiError ? "" : CARGANDO;
+  if (E.cambios.length === 0) return "<p>Sin cambios de datos registrados.</p>";
+  return `<div class="tabla"><table>
+    <tr><th>Fecha</th><th>Dato</th><th>Antes</th><th>Ahora</th><th>Agente</th></tr>
+    ${E.cambios.map(c => `<tr><td>${fechaCorta(c.fechaHora)}</td><td>${esc(c.campo)} (${esc(c.hoja)})</td>
+      <td>${esc(c.valorAnterior)}</td><td>${esc(c.valorNuevo)}</td><td>${esc(c.agente || "—")}</td></tr>`).join("")}
+  </table></div>`;
+}
+
 function render() {
   const nombre = `${E.nombre} ${E.apellido}`.trim() || (E.persona ? `${E.persona.nombres} ${E.persona.apellido}` : `DNI ${P.dni}`);
   const chipCli = E.esCliente === null ? "" : `<span class="chip">${E.esCliente ? "Cliente" : "No cliente"}</span>`;
@@ -202,7 +246,9 @@ function render() {
         <dt>Validación</dt><dd>Padrón (formato RENAPER) + sistema comercial</dd>
       </dl>
     </section>
-    <section class="card"><h2>Vista 360 · Grupo Belltech Demo</h2>${bloque360()}</section>`;
+    <section class="card"><h2>Vista 360 · Grupo Belltech Demo</h2>${bloque360()}</section>
+    <section class="card full"><h2>Historial de interacciones</h2>${bloqueHistorial()}</section>
+    <section class="card full"><h2>Cambios de datos</h2>${bloqueCambios()}</section>`;
 }
 
 async function api(tipo, id) {
@@ -213,7 +259,12 @@ async function api(tipo, id) {
 
 async function completarDesdeApi() {
   try {
-    const [ren, cli] = await Promise.all([api("renaper", P.dni), api("clientes", P.dni)]);
+    const [ren, cli, hist] = await Promise.all([
+      api("renaper", P.dni), api("clientes", P.dni),
+      api("interacciones", P.dni).catch(() => ({ interacciones: [], cambios: [] }))
+    ]);
+    E.historial = (hist && hist.interacciones) || [];
+    E.cambios = (hist && hist.cambios) || [];
     if (ren && !ren.error && ren.respuesta) {
       E.persona = ren.respuesta;
       if (E.persona._demo) E.dniVencido = !E.persona._demo.vigente;
@@ -242,6 +293,13 @@ if (!P.dni) {
 } else {
   render();             // 1) al instante, con lo que mandó el IVR
   completarDesdeApi();  // 2) completa desde la planilla
+  // 3) a los 6 s refresca el historial (el contacto en curso se registra al atender)
+  setTimeout(async () => {
+    try {
+      const h = await api("interacciones", P.dni);
+      E.historial = h.interacciones || []; E.cambios = h.cambios || []; render();
+    } catch (e) {}
+  }, 6000);
 }
 </script>
 </body>
