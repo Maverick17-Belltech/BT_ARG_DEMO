@@ -471,11 +471,12 @@ function mostrarAlta(motivo) {
     </section>
     <section class="card full" id="cardAlta">
       <h2>Alta de cliente nuevo${marca ? " · " + esc(marca.nombre) : ""}</h2>
+      <div id="avisoExiste"></div>
       ${CLAVE ? "" : `<div class="barra-clave"><span>🔒 Ingresá la clave de agente para dar de alta:</span>
         <input type="password" id="inClave" placeholder="Clave de agente" autocomplete="off">
         <button onclick="ingresarAlta()">Habilitar</button><span id="msgClave" class="msg"></span></div>`}
       <div class="fila">
-        <div><label>DNI (7 u 8 dígitos) *</label><input id="aDni" inputmode="numeric" value="${esc(P.dni)}"></div>
+        <div><label>DNI (7 u 8 dígitos) *</label><input id="aDni" inputmode="numeric" value="${esc(P.dni)}" onblur="verificarDni()"></div>
         <div><label>Apellido *</label><input id="aApe"></div>
         <div><label>Nombres *</label><input id="aNom"></div>
         <div><label>Sexo</label><select id="aSexo"><option></option><option>F</option><option>M</option><option>X</option></select></div>
@@ -493,6 +494,32 @@ function mostrarAlta(motivo) {
       <p class="bloqueado">Datos ficticios para la demo. Se carga con origen DEMO (se borra con el menú "BT_ARG Demo").</p>
       <p><button id="btnAlta" onclick="guardarAlta()" ${CLAVE ? "" : "disabled"}>Dar de alta</button> <span id="msgAlta" class="msg"></span></p>
     </section>`;
+}
+
+// Si el DNI ya está en el sistema, no se da de alta: se ofrece abrir la ficha del cliente existente
+async function verificarDni() {
+  const dni = ($("aDni").value || "").replace(/\D/g, "");
+  const caja = $("avisoExiste");
+  if (dni.length < 7 || dni.length > 8) { caja.innerHTML = ""; return false; }
+  try {
+    const ren = await api("renaper", dni);
+    if (ren && !ren.error && ren.respuesta) {
+      const nom = `${ren.respuesta.nombres} ${ren.respuesta.apellido}`;
+      caja.innerHTML = `<div class="alerta warn">El cliente ya existe: <b>${esc(nom)}</b> (DNI ${esc(dni)}).
+        No hace falta darlo de alta. <button onclick="abrirFichaExistente('${dni}')">Ver y editar su ficha</button></div>`;
+      $("btnAlta").disabled = true;
+      return true;
+    }
+  } catch (e) {}
+  caja.innerHTML = "";
+  if (CLAVE) $("btnAlta").disabled = false;
+  return false;
+}
+
+function abrirFichaExistente(dni) {
+  const u = new URLSearchParams(location.search);
+  u.set("dni", dni); u.delete("nom"); u.delete("ape"); u.delete("escli");
+  location.search = u.toString();
 }
 
 async function ingresarAlta() {
@@ -524,9 +551,11 @@ async function guardarAlta() {
     if (P.vertical === "LUZ") Object.assign(datos.producto, { deuda: "0.00", facturaDigital: "NO" });
     if (P.vertical === "GAS") Object.assign(datos.producto, { deuda: "0.00", facturaDigital: "NO" });
   }
+  if (await verificarDni()) return;   // ya existe: se ofrece abrir su ficha
   const btn = $("btnAlta"); btn.disabled = true;
   try {
     const r = await apiPost(datos);
+    if (r.codigo === 409) { await verificarDni(); return; }
     if (!r.ok) throw new Error(r.mensaje);
     aviso("msgAlta", true, "✓ Cliente dado de alta. Abriendo su ficha…");
     const u = new URLSearchParams(location.search);
