@@ -5,8 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ficha del cliente · BT_ARG Demo</title>
 <!--
-  BT_ARG_DEMO · Ficha del cliente para el agente (CXone Agent, POPURL → ContactPanel)  v3 (render instantáneo + historial)
-  DEMO Belltech Argentina: TODOS LOS DATOS SON FICTICIOS. Esta página solo LEE datos.
+  BT_ARG_DEMO · Ficha del cliente para el agente (CXone Agent, POPURL → ContactPanel)  v4 (lectura + escritura)
+  DEMO Belltech Argentina: TODOS LOS DATOS SON FICTICIOS.
+
+  ESCRITURA: la clave de agente NO está en este archivo. El agente la ingresa una vez por pestaña
+  (queda solo en sessionStorage de esa pestaña). Con la clave se habilita:
+    - Cerrar contacto: tema + conclusión + nota → historial de interacciones (por ID de contacto).
+    - Editar domicilio → planilla de alta + registro en "Cambios de datos".
+    - Alta de cliente nuevo (si llega sin DNI o el DNI no existe).
+  Los POST se envían como text/plain para evitar el bloqueo CORS del navegador.
 
   1) Se dibuja AL INSTANTE con los datos que manda el IVR en el link (nombre, alertas, cómo se identificó).
   2) Después completa en segundo plano desde la API (planilla): datos personales, producto, vista 360,
@@ -19,6 +26,7 @@
     venc              SI | NO  (DNI vencido)
     deuda             importe de deuda (Luz/Gas), ej. 12500.00
     mora              SI | NO  (Financiera)
+    agente            ID del agente que atiende (para registrar quién hizo cada cambio)
   Ej.: agente/ficha.html?dni=33777888&vertical=GAS&dato=CLIENTEGAS&ivr=3-1&nom=Sebastian&ape=Sosa&escli=SI&venc=NO&deuda=12500.00&mora=NO
 -->
 <style>
@@ -57,6 +65,21 @@
   th { color: var(--muted); font-weight: bold; background: #f8fafb; }
   tr.actual td { background: var(--brand-soft); font-weight: bold; }
   .tabla { overflow-x: auto; }
+  .acciones { padding: 0 12px 12px; display: grid; gap: 12px; }
+  .barra-clave { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #fff8e6; border: 1px solid #f0d58a; border-radius: 8px; padding: 10px 12px; }
+  .barra-clave.ok { background: var(--ok-soft); border-color: #a7d8bb; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input, select, textarea { width: 100%; padding: 7px 8px; border: 1px solid #c9d2dc; border-radius: 6px; font: inherit; background: #fff; color: var(--text); }
+  textarea { min-height: 60px; resize: vertical; }
+  .barra-clave input { width: auto; flex: 1 1 180px; }
+  .fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0 12px; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; font: inherit; font-weight: bold; cursor: pointer; background: var(--brand); color: #fff; }
+  button.sec { background: #e6eaef; color: var(--text); }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { font-weight: bold; margin-top: 8px; }
+  .msg.ok { color: var(--ok); } .msg.err { color: var(--bad); }
+  details > summary { cursor: pointer; font-weight: bold; color: var(--brand); }
+  .bloqueado { color: var(--muted); font-style: italic; }
   @media (min-width: 720px) { main { grid-template-columns: 1fr 1fr; } .full { grid-column: 1 / -1; } }
 </style>
 </head>
@@ -68,10 +91,11 @@
 <main id="contenido">
   <div class="estado full">Cargando datos del cliente…</div>
 </main>
+<section class="acciones" id="acciones"></section>
 <footer>DEMO Belltech Argentina · Datos ficticios · Fuentes: BT_ARG_Alta_Datos_Demo (clientes y cambios) · BT_ARG_Interacciones_Demo (historial) · Google Sheets</footer>
 
 <script>
-// URL pública de lectura de la API de la demo (Apps Script). Solo lectura: no hay claves en esta página.
+// URL de la API de la demo (Apps Script). Lectura pública; la escritura exige la clave que ingresa el agente.
 const API = "https://script.google.com/macros/s/AKfycbwmYcSf9tH_sZeU-rq1fZzFKtT7vawtmUJFaOJFmbiBiDBH8-m5vgQiYL_4qbEAbinOiA/exec";
 
 const MARCAS = {
@@ -104,7 +128,8 @@ const P = {
   escli: (q.get("escli") || "").toUpperCase(),
   venc: (q.get("venc") || "").toUpperCase(),
   deuda: q.get("deuda") || "",
-  mora: (q.get("mora") || "").toUpperCase()
+  mora: (q.get("mora") || "").toUpperCase(),
+  agente: q.get("agente") || ""
 };
 const marca = MARCAS[P.vertical];
 
@@ -212,7 +237,7 @@ function bloqueHistorial() {
       <td>${esc(r.ivr || "—")}</td>
       <td>${esc(RES_TXT[r.resultado] || r.resultado || "—")}</td>
       <td>${esc(r.agente || "—")}</td>
-      <td>${esc(r.disposicion || "—")}</td></tr>`).join("")}
+      <td>${esc([r.tema, r.disposicion].filter(Boolean).join(" — ") || "—")}${r.nota ? `<br><span class="bloqueado">${esc(r.nota)}</span>` : ""}</td></tr>`).join("")}
   </table></div>`;
 }
 
@@ -265,6 +290,7 @@ async function completarDesdeApi() {
     ]);
     E.historial = (hist && hist.interacciones) || [];
     E.cambios = (hist && hist.cambios) || [];
+    if (ren && ren.error) { mostrarAlta("El DNI " + P.dni + " no está en el sistema. Podés darlo de alta."); return; }
     if (ren && !ren.error && ren.respuesta) {
       E.persona = ren.respuesta;
       if (E.persona._demo) E.dniVencido = !E.persona._demo.vigente;
@@ -279,6 +305,237 @@ async function completarDesdeApi() {
     E.apiError = true;
   }
   render();
+  completarDomicilio();
+}
+
+// Completa el formulario de domicilio cuando llegan los datos (sin pisar lo que el agente ya escribió)
+function completarDomicilio() {
+  const p = E.persona || {};
+  const mapa = { dCalle: p.calle, dNumero: p.numeroCalle, dPiso: p.piso, dDepto: p.departamento, dCiudad: p.ciudad, dProv: p.provincia, dCP: p.cpostal };
+  Object.keys(mapa).forEach(id => { const el = $(id); if (el && !el.value) el.value = mapa[id] || ""; });
+}
+
+async function refrescarDatos() {
+  try {
+    const [ren, h] = await Promise.all([api("renaper", P.dni), api("interacciones", P.dni)]);
+    if (ren && ren.respuesta) E.persona = ren.respuesta;
+    E.historial = h.interacciones || []; E.cambios = h.cambios || [];
+    render();
+  } catch (e) {}
+}
+
+/* ======================= ESCRITURA (requiere clave de agente) ======================= */
+
+const TEMAS = {
+  BANCA: ["Consulta de saldo / movimientos", "Resumen y adhesión digital", "Bloqueo de tarjeta", "Préstamo personal", "Reclamo", "Cambio de datos", "Otro"],
+  SEGUROS: ["Consulta de póliza", "Denuncia de siniestro", "Seguimiento de siniestro", "Asistencia", "Renovación", "Cotización", "Cambio de datos", "Otro"],
+  FINANCIERA: ["Consulta de cuotas", "Pago / medios de pago", "Refinanciación", "Nuevo préstamo", "Cambio de datos", "Otro"],
+  GAS: ["Consulta de deuda / factura", "Plan de pago", "Factura digital", "Reconexión", "Emergencia / fuga", "Cambio de datos", "Otro"],
+  LUZ: ["Consulta de deuda / factura", "Corte de suministro", "Plan de pago", "Factura digital", "Reclamo técnico", "Cambio de datos", "Otro"]
+};
+const CONCLUSIONES = ["Resuelto", "Venta", "Reclamo generado", "Derivado", "Callback agendado", "No resuelto"];
+const PRODUCTO_ALTA = {
+  BANCA: [["segmento", "Segmento", "Clásica"], ["cuenta", "Cuenta", "CA $ 0001-"], ["tarjeta", "Tarjeta", "Visa terminada en "]],
+  SEGUROS: [["poliza", "Póliza", "AUT-"], ["ramo", "Ramo", "Automotor"], ["cobertura", "Cobertura", "Terceros completo"]],
+  FINANCIERA: [["prestamo", "Préstamo", "PP-"], ["cuotasTotales", "Cuotas totales", "12"], ["cuotaMensual", "Cuota mensual", "0.00"]],
+  LUZ: [["nroMedidor", "N° de medidor (10 dígitos)", ""], ["nroCuenta", "N° de cuenta (10 dígitos)", ""], ["domicilioSuministro", "Domicilio de suministro", ""]],
+  GAS: [["nroCliente", "N° de cliente (12 dígitos)", ""], ["domicilioSuministro", "Domicilio de suministro", ""]]
+};
+
+let CLAVE = "";
+try { CLAVE = sessionStorage.getItem("btarg_clave") || ""; } catch (e) {}
+
+async function apiPost(cuerpo) {
+  const r = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },   // evita el preflight CORS
+    body: JSON.stringify(Object.assign({ clave: CLAVE, agente: P.agente, contactId: P.contacto }, cuerpo))
+  });
+  return r.json();
+}
+
+function aviso(id, ok, texto) {
+  const el = $(id); if (!el) return;
+  el.className = "msg " + (ok ? "ok" : "err");
+  el.textContent = texto;
+}
+
+function barraClave() {
+  if (CLAVE) return `<div class="barra-clave ok"><span>🔓 Edición habilitada para esta pestaña.</span>
+    <button class="sec" onclick="salir()">Bloquear</button></div>`;
+  return `<div class="barra-clave"><span>🔒 Para cerrar el contacto o editar datos, ingresá la clave de agente:</span>
+    <input type="password" id="inClave" placeholder="Clave de agente" autocomplete="off">
+    <button onclick="ingresar()">Habilitar</button><span id="msgClave" class="msg"></span></div>`;
+}
+
+async function ingresar() {
+  const v = ($("inClave").value || "").trim();
+  if (!v) return;
+  CLAVE = v;
+  try {
+    const r = await apiPost({ accion: "validarClave" });
+    if (!r.ok) throw new Error(r.mensaje || "Clave inválida");
+    try { sessionStorage.setItem("btarg_clave", CLAVE); } catch (e) {}
+    renderAcciones();
+  } catch (e) {
+    CLAVE = "";
+    aviso("msgClave", false, "Clave inválida. Probá de nuevo.");
+  }
+}
+
+function salir() {
+  CLAVE = "";
+  try { sessionStorage.removeItem("btarg_clave"); } catch (e) {}
+  renderAcciones();
+}
+
+function opciones(lista) { return lista.map(x => `<option>${esc(x)}</option>`).join(""); }
+
+function renderAcciones() {
+  if (!P.dni) return;
+  const cont = $("acciones");
+  if (!CLAVE) { cont.innerHTML = barraClave(); return; }
+  const temas = TEMAS[P.vertical] || TEMAS.BANCA;
+  const p = E.persona || {};
+  cont.innerHTML = barraClave() + `
+    <section class="card">
+      <h2>Cerrar contacto</h2>
+      ${P.contacto ? "" : '<p class="bloqueado">Sin ID de contacto: se registra igual como interacción nueva.</p>'}
+      <div class="fila">
+        <div><label>Tema</label><select id="selTema">${opciones(temas)}</select></div>
+        <div><label>Conclusión</label><select id="selConcl">${opciones(CONCLUSIONES)}</select></div>
+      </div>
+      <label>Nota para el historial (opcional)</label>
+      <textarea id="txtNota" maxlength="300" placeholder="Ej.: se informó la deuda y se ofreció plan de pago"></textarea>
+      <p><button id="btnCerrar" onclick="cerrarContacto()">Guardar conclusión</button> <span id="msgCerrar" class="msg"></span></p>
+    </section>
+    <section class="card">
+      <details id="detDom"><summary>Editar domicilio</summary>
+        <div class="fila">
+          <div><label>Calle</label><input id="dCalle" value="${esc(p.calle || "")}"></div>
+          <div><label>Número</label><input id="dNumero" value="${esc(p.numeroCalle || "")}"></div>
+          <div><label>Piso</label><input id="dPiso" value="${esc(p.piso || "")}"></div>
+          <div><label>Depto.</label><input id="dDepto" value="${esc(p.departamento || "")}"></div>
+          <div><label>Ciudad</label><input id="dCiudad" value="${esc(p.ciudad || "")}"></div>
+          <div><label>Provincia</label><input id="dProv" value="${esc(p.provincia || "")}"></div>
+          <div><label>Código postal</label><input id="dCP" value="${esc(p.cpostal || "")}"></div>
+        </div>
+        <p><button id="btnDom" onclick="guardarDomicilio()">Guardar domicilio</button> <span id="msgDom" class="msg"></span></p>
+      </details>
+    </section>`;
+}
+
+async function cerrarContacto() {
+  const btn = $("btnCerrar"); btn.disabled = true;
+  try {
+    const r = await apiPost({ accion: "conclusion", dni: P.dni, vertical: P.vertical, dato: P.dato, ivr: P.ivr,
+      resultado: "OK", tema: $("selTema").value, disposicion: $("selConcl").value, nota: $("txtNota").value.trim() });
+    if (!r.ok) throw new Error(r.mensaje);
+    aviso("msgCerrar", true, "✓ Conclusión guardada en el historial");
+    refrescarDatos();
+  } catch (e) {
+    aviso("msgCerrar", false, "No se pudo guardar (" + (e.message || "error") + "). Tus datos siguen cargados: reintentá.");
+  }
+  btn.disabled = false;
+}
+
+async function guardarDomicilio() {
+  const btn = $("btnDom"); btn.disabled = true;
+  const cambios = {
+    calle: $("dCalle").value.trim().toUpperCase(), numeroCalle: $("dNumero").value.trim(),
+    piso: $("dPiso").value.trim(), departamento: $("dDepto").value.trim(),
+    ciudad: $("dCiudad").value.trim().toUpperCase(), provincia: $("dProv").value.trim().toUpperCase(), cpostal: $("dCP").value.trim()
+  };
+  if (!cambios.calle || !cambios.numeroCalle) { aviso("msgDom", false, "Calle y número son obligatorios."); btn.disabled = false; return; }
+  try {
+    const r = await apiPost({ dni: P.dni, hoja: "Personas", cambios });
+    if (!r.ok) throw new Error(r.mensaje);
+    aviso("msgDom", true, r.cambios.length ? `✓ Domicilio actualizado (${r.cambios.length} dato/s)` : "No había cambios para guardar");
+    refrescarDatos();
+  } catch (e) {
+    aviso("msgDom", false, "No se pudo guardar (" + (e.message || "error") + "). Tus datos siguen cargados: reintentá.");
+  }
+  btn.disabled = false;
+}
+
+/* ----------------------- Alta de cliente nuevo ----------------------- */
+
+function mostrarAlta(motivo) {
+  const vert = P.vertical;
+  const campos = PRODUCTO_ALTA[vert] || [];
+  $("acciones").innerHTML = "";
+  $("contenido").innerHTML = `
+    <section class="card full">
+      <p class="nombre">Cliente no identificado</p>
+      <div class="alerta warn">${esc(motivo)}</div>
+    </section>
+    <section class="card full" id="cardAlta">
+      <h2>Alta de cliente nuevo${marca ? " · " + esc(marca.nombre) : ""}</h2>
+      ${CLAVE ? "" : `<div class="barra-clave"><span>🔒 Ingresá la clave de agente para dar de alta:</span>
+        <input type="password" id="inClave" placeholder="Clave de agente" autocomplete="off">
+        <button onclick="ingresarAlta()">Habilitar</button><span id="msgClave" class="msg"></span></div>`}
+      <div class="fila">
+        <div><label>DNI (7 u 8 dígitos) *</label><input id="aDni" inputmode="numeric" value="${esc(P.dni)}"></div>
+        <div><label>Apellido *</label><input id="aApe"></div>
+        <div><label>Nombres *</label><input id="aNom"></div>
+        <div><label>Sexo</label><select id="aSexo"><option></option><option>F</option><option>M</option><option>X</option></select></div>
+        <div><label>Fecha de nacimiento</label><input id="aNac" type="date"></div>
+        <div><label>Calle *</label><input id="aCalle"></div>
+        <div><label>Número *</label><input id="aNum"></div>
+        <div><label>Piso</label><input id="aPiso"></div>
+        <div><label>Depto.</label><input id="aDto"></div>
+        <div><label>Ciudad</label><input id="aCiudad"></div>
+        <div><label>Provincia</label><input id="aProv"></div>
+        <div><label>Código postal</label><input id="aCP"></div>
+      </div>
+      ${campos.length ? `<h2 style="margin-top:14px">Producto ${marca ? esc(marca.nombre) : ""}</h2><div class="fila">
+        ${campos.map(([k, l, v]) => `<div><label>${esc(l)}</label><input id="p_${k}" value="${esc(v)}"></div>`).join("")}</div>` : ""}
+      <p class="bloqueado">Datos ficticios para la demo. Se carga con origen DEMO (se borra con el menú "BT_ARG Demo").</p>
+      <p><button id="btnAlta" onclick="guardarAlta()" ${CLAVE ? "" : "disabled"}>Dar de alta</button> <span id="msgAlta" class="msg"></span></p>
+    </section>`;
+}
+
+async function ingresarAlta() {
+  const v = ($("inClave").value || "").trim(); if (!v) return;
+  CLAVE = v;
+  try {
+    const r = await apiPost({ accion: "validarClave" });
+    if (!r.ok) throw new Error();
+    try { sessionStorage.setItem("btarg_clave", CLAVE); } catch (e) {}
+    $("btnAlta").disabled = false;
+    aviso("msgClave", true, "✓ Edición habilitada");
+  } catch (e) { CLAVE = ""; aviso("msgClave", false, "Clave inválida."); }
+}
+
+async function guardarAlta() {
+  const dni = ($("aDni").value || "").replace(/\D/g, "");
+  const datos = {
+    accion: "alta", dni, apellido: $("aApe").value.trim(), nombres: $("aNom").value.trim(), sexo: $("aSexo").value,
+    fechaNacimiento: $("aNac").value, calle: $("aCalle").value.trim(), numeroCalle: $("aNum").value.trim(),
+    piso: $("aPiso").value.trim(), departamento: $("aDto").value.trim(), ciudad: $("aCiudad").value.trim(),
+    provincia: $("aProv").value.trim(), cpostal: $("aCP").value.trim(), vertical: P.vertical
+  };
+  if (dni.length < 7 || dni.length > 8) { aviso("msgAlta", false, "El DNI debe tener 7 u 8 dígitos."); return; }
+  if (!datos.apellido || !datos.nombres || !datos.calle || !datos.numeroCalle) { aviso("msgAlta", false, "Completá los campos con *."); return; }
+  const campos = PRODUCTO_ALTA[P.vertical] || [];
+  if (campos.length) {
+    datos.producto = {};
+    campos.forEach(([k]) => { datos.producto[k] = $("p_" + k).value.trim(); });
+    if (P.vertical === "LUZ") Object.assign(datos.producto, { deuda: "0.00", facturaDigital: "NO" });
+    if (P.vertical === "GAS") Object.assign(datos.producto, { deuda: "0.00", facturaDigital: "NO" });
+  }
+  const btn = $("btnAlta"); btn.disabled = true;
+  try {
+    const r = await apiPost(datos);
+    if (!r.ok) throw new Error(r.mensaje);
+    aviso("msgAlta", true, "✓ Cliente dado de alta. Abriendo su ficha…");
+    const u = new URLSearchParams(location.search);
+    u.set("dni", dni); u.set("nom", datos.nombres.split(" ")[0]); u.set("ape", datos.apellido); u.set("escli", campos.length ? "SI" : "NO");
+    setTimeout(() => { location.search = u.toString(); }, 1200);
+  } catch (e) {
+    aviso("msgAlta", false, "No se pudo dar de alta (" + (e.message || "error") + "). Tus datos siguen cargados.");
+    btn.disabled = false;
+  }
 }
 
 // ---- Inicio ----
@@ -289,9 +546,10 @@ if (marca) {
   document.title = `${marca.nombre} · Ficha del cliente`;
 }
 if (!P.dni) {
-  $("contenido").innerHTML = '<div class="estado full">No se recibió el DNI del cliente (parámetro dni).</div>';
+  mostrarAlta("El cliente no se identificó en el IVR. Si no está en el sistema, podés darlo de alta.");
 } else {
   render();             // 1) al instante, con lo que mandó el IVR
+  renderAcciones();     //    barra de clave / cierre del contacto
   completarDesdeApi();  // 2) completa desde la planilla
   // 3) a los 6 s refresca el historial (el contacto en curso se registra al atender)
   setTimeout(async () => {
